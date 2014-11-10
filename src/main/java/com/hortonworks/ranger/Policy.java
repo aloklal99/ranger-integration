@@ -90,4 +90,19 @@ public class Policy {
 	public String getId() {
 		return id.toString();
 	}
+
+	/**
+	 * If the policy is a candidate for disabling (instead of editing) for a group if all of the following are true
+	 * 1 - There is just one permission item in the policy
+	 * 2 - That permission item could safely be deleted without altering permissions for anyone else.
+	 * @param group
+	 * @return
+	 */
+	public boolean isACandidateForDisabling(String group) {
+		if (permMapList.size() != 1) {
+			return false;
+		}
+		Permissions permissions = permMapList.get(0);
+		return permissions.isACandidateForDeletion(group);
+	}
 }

@@ -7,24 +7,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
-import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.Invocation.Builder;
-import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.NewCookie;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.StatusType;
 import javax.xml.bind.DatatypeConverter;
 
 import org.apache.log4j.Logger;
 
-import com.google.common.util.concurrent.CycleDetectingLockFactory.Policies;
 import com.google.gson.Gson;
 
 /**
@@ -95,7 +85,7 @@ public class App
 					_Logger.info(String.format("No current policies for entitlement[%s]!  Treating as a noop!", entitlement));
 				}
 				else {
-					revokePermissions(existingPolicyDetails, entitlement.resource, entitlement.group);
+					revokePermissions(existingPolicyDetails, input.host, entitlement.resource, entitlement.group);
 				}
 			}
 			
@@ -116,20 +106,24 @@ public class App
 			// Instead of adding update permission if one exists with all required permission-types
 			Permissions permissions = new Permissions(group); 
 			policy.permMapList.add(permissions);
-			String json = _Gson.toJson(policy);
-			_Logger.debug("updatePolicy: json [" + json + "].");
-	    	int status = ClientBuilder.newClient()
-	        		.target(getPolicyURL(host))
-	        		.path(policy.getId())
-	        		.request()
-	        		.header(Constants.Headers.Auth, getBasicAuth())
-	        		.accept(MediaType.APPLICATION_JSON)
-	        		.put(Entity.entity(json, MediaType.APPLICATION_JSON))
-	        		.getStatus();
-	        _Logger.debug("updatePolicy: PUT status: [" + status + "].");		
+			put(policy, host);
 		}
 	}
 
+	private static void put(Policy policy, String host) {
+		String json = _Gson.toJson(policy);
+		_Logger.debug("updatePolicy: json [" + json + "].");
+    	int status = ClientBuilder.newClient()
+        		.target(getPolicyURL(host))
+        		.path(policy.getId())
+        		.request()
+        		.header(Constants.Headers.Auth, getBasicAuth())
+        		.accept(MediaType.APPLICATION_JSON)
+        		.put(Entity.entity(json, MediaType.APPLICATION_JSON))
+        		.getStatus();
+        _Logger.debug("updatePolicy: PUT status: [" + status + "].");		
+	}
+	
 	private static void addNewPolicy(String host, String repository, String resource, String group) {
 		Permissions permissions = new Permissions(group);
 		Policy policy = new Policy(resource, repository, permissions);
@@ -146,35 +140,43 @@ public class App
         _Logger.debug("addNewPolicy: POST status: [" + status + "].");		
 	}
 
-	private static void grantPermissions(PolicyDetails existingPolicyDetails,
-			String resource, String group) {
+	private static void revokePermissions(PolicyDetails policyDetails, String host, String resource, String group) {
 		
-	}
-
-	private static void revokePermissions(PolicyDetails policyDetails,
-			String resource, String group) {
 		for (Policy policy : policyDetails.vXPolicies) {
 			if (policy.hasMultipleResources()) {
 				String msg = String.format("Can't Revoke permission for group[%s], resource[%s] since policy [%s] is for multiple resources",
 						group, resource, policy);
 				_Logger.warn(msg);
-				continue;
 			}
-			for (Permissions permissions : policy.permMapList) {
-				List<String> groups = permissions.groupList; 
-				if (groups.contains(group)) {
-					Iterator<String> iter = groups.iterator();
-					while(iter.hasNext()){
-					    if(iter.next().equals(group)) {
-					        iter.remove();
-					    }
+			else if (policy.isACandidateForDisabling(group)) {
+				_Logger.info(String.format("revokePermissions: policy has only one group based permissions for a single group[%s].  Disabling the policy", policy, group));
+				policy.isEnabled = false;
+				put(policy, host);
+			}
+			else {
+				Iterator<Permissions> permissionsIterator = policy.permMapList.iterator();
+				while (permissionsIterator.hasNext()) {
+					Permissions permission = permissionsIterator.next();
+					if (permission.isACandidateForDeletion(group)) {
+						permissionsIterator.remove();
+						put(policy, host);
 					}
-					
+					else {
+						List<String> groups = permission.groupList; 
+						if (groups.contains(group)) {
+							Iterator<String> groupsIterator = groups.iterator();
+							while(groupsIterator.hasNext()){
+							    if(groupsIterator.next().equals(group)) {
+							        groupsIterator.remove();
+							    }
+							}
+							put(policy, host);
+						}
+						else {
+							_Logger.debug(String.format("Permissions [%s] isn't relevant for group[%s].  Leaving unchanged....!", permission, group));
+						}
+					}
 				}
-				else {
-					_Logger.warn(String.format("Permissions [%s] isn't relevant for group[%s].  Skipping....!", permissions, group));
-				}
-				
 			}
 		}
 	}
