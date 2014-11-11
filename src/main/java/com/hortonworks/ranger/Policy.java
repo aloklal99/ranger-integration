@@ -70,7 +70,8 @@ public class Policy {
     }
 
 	public boolean hasMultipleResources() {
-		return resourceName.split("\\s*,\\s").length > 1; 
+		String[] tokens = resourceName.split("\\s*,\\s*"); 
+		return tokens.length > 1; 
 	}
 
 	public boolean isForResource(String resource) {
@@ -92,17 +93,21 @@ public class Policy {
 	}
 
 	/**
-	 * If the policy is a candidate for disabling (instead of editing) for a group if all of the following are true
+	 * If the policy is a candidate for deleting (instead of editing) for a group if all of the following are true
 	 * 1 - There is just one permission item in the policy
 	 * 2 - That permission item could safely be deleted without altering permissions for anyone else.
 	 * @param group
 	 * @return
 	 */
-	public boolean isACandidateForDisabling(String group) {
+	public boolean isForASingleGroup(String group) {
 		if (permMapList.size() != 1) {
 			return false;
 		}
 		Permissions permissions = permMapList.get(0);
-		return permissions.isACandidateForDeletion(group);
+		return permissions.isForASingleGroup(group);
+	}
+
+	public boolean isEmpty() {
+		return permMapList.size() == 0;
 	}
 }

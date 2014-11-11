@@ -14,6 +14,8 @@ public class Constants {
 	static class Parameter {
 		static final String Resource = "resourceName";
 		public static final String Repository = "repositoryName";
+		public static final String Enabled = "isEnabled";
+		public static final String Recursive = "isRecursive";
 	}
 
 	static class MediaType {
@@ -34,3 +36,4 @@ public class Constants {
 		static final String Auth = "Authorization";
 	}
 }
+

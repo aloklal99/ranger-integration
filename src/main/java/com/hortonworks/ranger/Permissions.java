@@ -1,15 +1,15 @@
 package com.hortonworks.ranger;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.base.MoreObjects;
 
 public class Permissions {
-	List<String> groupList;
-	List<String> userList;
-	List<String> permList;
+	final List<String> groupList;
+	final List<String> userList;
+	final List<String> permList;
 	
 	Permissions() {
 		groupList = new ArrayList<String>();
@@ -17,13 +17,14 @@ public class Permissions {
 		permList = new ArrayList<String>();
 	}
 	
-	Permissions(String group) {
+	Permissions(List<String> groups, List<String> users, List<String> accesses) {
 		this();
-		groupList.add(group);
-		permList.addAll(Arrays.asList(new String[] { "Read", "Write", "Execute" })); 
+		groupList.addAll(groups);
+		userList.addAll(users);
+		permList.addAll(accesses);
 	}
 	
-    public String toString() {
+	public String toString() {
 		return MoreObjects.toStringHelper("\n\t\tPermissions")
 				.add("groupList", groupList)
 				.add("userList", userList)
@@ -31,25 +32,35 @@ public class Permissions {
 				.toString();
     }
 
-    /**
-     * A permission is a candidate for removal for a group if and only if
-     * it is purely a group-based policy for just that group
-     * @param group
-     * @return
-     */
-    public boolean isACandidateForDeletion(String group) {
+    public boolean isForASingleGroup(String group) {
     	if (userList.size() != 0) {
     		return false;
-    	}
-    	if (groupList.size() == 0) {
-    		// it would be odd to have a permission that has neither user not groups in it.
-    		// but if there exists on then sure, delete it.  It is bogus anyway!
-    		return true;
     	}
     	if (groupList.size() != 1) {
     		return false;
     	}
     	String policyGroup = groupList.get(0);
     	return policyGroup.equals(group);
+	}
+
+    /**
+     * Removes the specified group.  Returns true if group was currently in the grouplist, false otherwise
+     * @param group
+     */
+	public boolean removeGroup(String group) {
+		boolean result = false;
+		Iterator<String> iterator = groupList.iterator();
+		while (iterator.hasNext()) {
+			if (iterator.next().equals(group)) {
+				iterator.remove();
+				result = true;
+			}
+		}
+		
+		return result;
+	}
+	
+	public boolean isEmpty() {
+		return groupList.size() == 0 && userList.size() == 0;
 	}
 }
